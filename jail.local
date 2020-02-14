@@ -345,7 +345,7 @@ port     = http,https
 filter   = http-get-dos
 logpath  = /var/log/nginx/access.log
 # maxretry is the maximum times of tries before the originating IP gets blocked.
-maxretry = 15 
+maxretry = 300
 # findtime is the time window (in seconds) where the maxretry times should occur, for the IP to get blocked.
 findtime = 300
 #ban for 5 minutes
