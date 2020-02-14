@@ -68,8 +68,14 @@ Allowing HTTP and HTTPS TCP connections is mandatory for the Web Server Bonus pa
 ## Add DOS protections
 
 Install `fail2ban` and `nginx`.
+We will use nginx in the first bonus part.
 
 See `jail.local`.
 Links :
 - https://serverfault.com/questions/690820/fail2ban-filter-errors 
 
+## Prevent port scanning
+
+Install `portsentry` : `sudo apt install portsentry`.
+
+Modify the file `/etc/default/portsentry` to enable automatic mode.
