@@ -152,7 +152,7 @@ Execute the script every week at 4:00am and after reboot (put it in update.cron)
 0 4 * * 1 /home/roger/update.sh
 ```
 
-See [https://crontab.guru/](crontab guru) for more informations about cron expressions.
+See [crontab guru](https://crontab.guru/) for more informations about cron expressions.
 
 To setup the execution of this file using cron :
 
@@ -190,7 +190,7 @@ Follow these instructions to setup email sending :
 - Keep the local address extension character
 - Enable all internet protocols
 
-We can use [https://doc.ubuntu-fr.org/mutt](mutt) to watch our emails :
+We can use [mutt](https://doc.ubuntu-fr.org/mutt) to watch our emails :
 
 ```
 sudo apt install mutt
