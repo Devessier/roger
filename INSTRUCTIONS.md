@@ -79,3 +79,93 @@ Links :
 Install `portsentry` : `sudo apt install portsentry`.
 
 Modify the file `/etc/default/portsentry` to enable automatic mode.
+
+## Stop unused services
+
+Run the following commands :
+
+Here are our launched services (`ls -1 /etc/init.d`) :
+
+```
+apparmor
+console-setup.sh
+cron
+dbus (utility to send messages accross applications)
+fail2ban
+hwclock.sh (hardware clock)
+keyboard-setup.sh
+kmod (Program to manage Linux Kernel modules)
+networking
+nginx
+portsentry
+procps (utilities for /proc directory)
+rsyslog (forward log messages to an IP)
+sendmail
+ssh
+sudo
+udev (Dynamic device management)
+ufw (our program to manage the firewall)
+```
+
+We will stop the following services :
+
+```
+console-setup.sh
+keyboard-setup.sh
+sendmail
+```
+
+Paste to a shell :
+
+```
+sudo /etc/init.d/console-setup.sh stop;
+sudo /etc/init.d/keyboard-setup.sh stop;
+sudo /etc/init.d/sendmail stop;
+```
+
+## Create a script to update packages
+
+The script (update.sh) :
+
+```
+#!/usr/bin/env sh
+
+# The `-y` parameter permits to accept everything
+
+apt-get update -y >> /var/log/update_script.log
+
+apt-get upgrade -y >> /var/log/update_script.log
+```
+
+Make this script executable :
+
+```
+chmod 755 ./update.sh
+```
+
+Execute the script every week at 4:00am and after reboot (put it in update.cron) :
+
+```
+@reboot /home/roger/update.sh
+0 4 * * 1 /home/roger/update.sh
+```
+
+See [https://crontab.guru/](crontab guru) for more informations about cron expressions.
+
+To setup the execution of this file using cron :
+
+```
+sudo crontab < update.cron
+```
+
+We can try the execution of the cron `@reboot` like that :
+
+```
+sudo rm /var/log/update_script.log
+
+sudo reboot
+
+# waiting for the system to reboot and then reconnect using ssh
+
+ls /var/log/update_script.log
+```
