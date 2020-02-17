@@ -74,6 +74,8 @@ See `jail.local`.
 Links :
 - https://serverfault.com/questions/690820/fail2ban-filter-errors 
 
+Look at the entries `http-get-dos` and `sshd`.
+
 ## Prevent port scanning
 
 Install `portsentry` : `sudo apt install portsentry`.
@@ -112,7 +114,6 @@ We will stop the following services :
 ```
 console-setup.sh
 keyboard-setup.sh
-sendmail
 ```
 
 Paste to a shell :
@@ -120,10 +121,11 @@ Paste to a shell :
 ```
 sudo /etc/init.d/console-setup.sh stop;
 sudo /etc/init.d/keyboard-setup.sh stop;
-sudo /etc/init.d/sendmail stop;
 ```
 
 ## Create a script to update packages
+
+This script must be run on **sudo**.
 
 The script (update.sh) :
 
@@ -168,4 +170,97 @@ sudo reboot
 # waiting for the system to reboot and then reconnect using ssh
 
 ls /var/log/update_script.log
+```
+
+## Monitor /etc/crontab changes
+
+If this file is modified send an email to the root user.
+The verification must occur each day at midnight.
+
+Follow these instructions to setup email sending :
+
+- Install `postfix`
+- Select `Local Only` and take `example.com` as system mail name
+- `Root and master mail recipien`t = `root@localhost`
+- `Other destinations` = `example.org, debian.lan, localhost.lan, , localhost`
+- Don't use `force synchronous updates on mail queue`
+- Keep local networks defaults
+- Don't use procmail
+- Keep a mailbox size limit of `0`
+- Keep the local address extension character
+- Enable all internet protocols
+
+We can use [https://doc.ubuntu-fr.org/mutt](mutt) to watch our emails :
+
+```
+sudo apt install mutt
+```
+
+Put the configuration of `mutt` on `/root` directory :
+
+```
+set mbox_type=Maildir
+set folder="/root/mail"
+set mask="!^\\.[^.]"
+set mbox="/root/mail"
+set record="+.Sent"
+set postponed="+.Drafts"
+set spoolfile="/root/mail"
+```
+
+We can launch `mutt` to watch our emails using just `mutt` :tada:!
+
+To send emails we will use `bsd-mailx`:
+
+```
+sudo apt install bsd-mailx
+```
+
+This is the same command as on macOS.
+
+
+We can send an email to the root account using :
+
+```
+echo "Email body" | sudo mail -s "Email subject" root@localhost
+```
+
+The script to monitor /etc/crontab file :
+
+```
+#!/usr/bin/env bash
+
+readonly SUM_FILE="$HOME/.crontab.sum"
+
+touch $SUM_FILE
+
+oldsum=$(cat $SUM_FILE)
+newsum=$(shasum /etc/crontab | awk '{ print $1 }')
+
+echo $oldsum
+echo $newsum
+
+if [ "$oldsum" != "$newsum" ]
+then
+	# a modification occured, send an email to the root user
+	echo $newsum > $SUM_FILE
+
+	cat <<'EOF' | sudo mail -s "The file /etc/crontab has been modified" root@localhost
+Go to /etc/crontab NOW !
+Someone modified it !
+EOF
+
+fi
+```
+
+Create a file named `monitor.cron` containing the cron scheduling for `monitor.sh` file :
+
+```
+0 0 * * * ~/monitor.sh
+``` 
+
+To append this cron job to the previous ones inserted do :
+
+```
+sudo crontab -l | cat - ./monitor.cron > crontab.txt && sudo crontab crontab.txt && rm crontab.txt
 ```
