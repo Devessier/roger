@@ -15,12 +15,26 @@ And then and the user to the sudoers group.
 
 - In the settings of the VM in VirtualBox, replace `NAT` by `Bridged Adaptater`
 - Enable `enp0s3` in /etc/network/interfaces
-- Configure the file `/etc/network/interfaces.d/enp0s3` :
+- Configure the file `/etc/network/interfaces` :
 ```
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+source /etc/network/interfaces.d/*
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto enp0s3
+allow-hotplug enp0s3
 iface enp0s3 inet static
-	address 10.11.200.247
+	address 192.168.68.117
 	netmask 255.255.255.252
-	gateway 10.11.254.254
+	gateway 192.168.68.1
+	broadcast 192.168.255
+	dns-nameservers 192.168.8.254
 ```
 - Restart the network service with `sudo service networking restart`
 - We should see our new IP using `ip addr show enp0s3` 🎉
@@ -36,29 +50,34 @@ The following operations have to be completed into `/etc/ssh/sshd_config` file :
 1. Change the sshd port by modifying `Port 22` to `Port 2222`
 2. Disallow root login by setting `PermitRootLogin` to `no`
 3. Create a ssh key for `roger` user using `ssh-keygen`
+4. Force pubkey authentication by returning into `/etc/ssh/sshd_config` for setting `PubkeyAuthentication` to `no`
+5. Restart `sshd` service with `sudo service sshd restart`
 
 We have some things to do to finish this part :
 
-1. Save that key into the server which in our case is also the client (LOL) : `ssh-copy-id -i ~/.ssh/id_rsa.pub roger@10.11.200.247 -p 50000`
+1. Save that key into the server which in our case is also the client (LOL) : `ssh-copy-id -i ~/.ssh/id_rsa.pub roger@192.168.68.117 -p 2222`
 2. Now when we try to connect using SSH the passphrase will be asked and not anymore our password. The passphrase is `roger`.
-3. Disable password authentication by returning into `/etc/ssh/sshd_config` to set the entry `PasswordAuthentication` to `no`
 
 ## Configure the Firewall
 
 We will only accept HTTP, HTTPS and SSH using `ufw`.
 
+Install `ufw` with `sudo apt intall ufw`.
+
 Run :
 ```
 # By default deny all incoming requests
 sudo ufw default deny incoming
-# By default allow all outcoming requests
-sudo ufw default allow outcoming
+
 # To accept SSH connections
-sudo ufw allow 50000/tcp
+sudo ufw allow 2222/tcp
+
 # To accept HTTP connections
 sudo ufw allow 80/tcp
+
 # To accept HTTPS connections
 sudo ufw allow 443/tcp
+
 # Launch ufw on startup
 sudo ufw enable
 ```
@@ -70,57 +89,80 @@ Allowing HTTP and HTTPS TCP connections is mandatory for the Web Server Bonus pa
 Install `fail2ban` and `nginx`.
 We will use nginx in the first bonus part.
 
-See `jail.local`.
-Links :
-- https://serverfault.com/questions/690820/fail2ban-filter-errors 
+See `jail.local` and `http-get-dos.conf` files.
 
-Look at the entries `http-get-dos` and `sshd`.
+Look at `http-get-dos` and `sshd` entries.
 
 ## Prevent port scanning
 
-Install `portsentry` : `sudo apt install portsentry`.
+Install `portsentry`: `sudo apt install portsentry`.
 
-Modify the file `/etc/default/portsentry` to enable automatic mode.
+Modify `/etc/default/portsentry` and `/etc/default/portsentry.conf` files to enable automatic mode.
+
+We can scan ports using :
+```
+nmap -p 1-3000 192.168.68.117
+```
+
+To unban the IP :
+1. check `/etc/hosts.deny` and delete our IP
+2. run `route del <IP> reject`
 
 ## Stop unused services
 
 Run the following commands :
 
-Here are our launched services (`ls -1 /etc/init.d`) :
+Here are our launched services (`sudo systemctl list-unit-files | grep enabled`) :
 
 ```
-apparmor
-console-setup.sh
-cron
-dbus (utility to send messages accross applications)
-fail2ban
-hwclock.sh (hardware clock)
-keyboard-setup.sh
-kmod (Program to manage Linux Kernel modules)
-networking
-nginx
-portsentry
-procps (utilities for /proc directory)
-rsyslog (forward log messages to an IP)
-sendmail
-ssh
-sudo
-udev (Dynamic device management)
-ufw (our program to manage the firewall)
+anacron.service
+apparmor.service
+autovt@.service
+bluetooth.service
+console-setup.service
+cron.service
+dbus-fi.w1.wpa_supplicant1.service
+dbus-org.bluez.service
+dbus-org.freedesktop.timesync1.service
+fail2ban.service
+getty@.service
+keyboard-setup.service
+networking.service
+nginx.service
+rsyslog.service
+ssh.service
+sshd.service
+syslog.service
+systemd-fsck-root.service
+systemd-timesyncd.service
+ufw.service
+wpa_supplicant.service
+remote-fs.target
+anacron.timer
+apt-daily-upgrade.timer
+apt-daily.timer
+logrotate.timer
+man-db.timer
 ```
 
-We will stop the following services :
+We will keep the following services :
 
 ```
-console-setup.sh
-keyboard-setup.sh
+cron.service
+autovt@.service # necessary for virtual terminals
+fail2ban.service
+getty@.service # necessary for logging in
+networking.service # necessary to have internet connection
+nginx.service # useful for bonus part
+ssh.service
+sshd.service
+ufw.service # our firewall manager
 ```
 
-Paste to a shell :
+Stop all unused services with :
 
 ```
-sudo /etc/init.d/console-setup.sh stop;
-sudo /etc/init.d/keyboard-setup.sh stop;
+sudo systemctl disable <SERVICE>
 ```
 
 ## Create a script to update packages
@@ -181,7 +223,7 @@ Follow these instructions to setup email sending :
 
 - Install `postfix`
 - Select `Local Only` and take `example.com` as system mail name
-- `Root and master mail recipien`t = `root@localhost`
+- `Root and master mail recipient` = `root@localhost`
 - `Other destinations` = `example.org, debian.lan, localhost.lan, , localhost`
 - Don't use `force synchronous updates on mail queue`
 - Keep local networks defaults
@@ -196,18 +238,6 @@ We can use [mutt](https://doc.ubuntu-fr.org/mutt) to watch our emails :
 sudo apt install mutt
 ```
 
-Put the configuration of `mutt` on `/root` directory :
-
-```
-set mbox_type=Maildir
-set folder="/root/mail"
-set mask="!^\\.[^.]"
-set mbox="/root/mail"
-set record="+.Sent"
-set postponed="+.Drafts"
-set spoolfile="/root/mail"
-```
-
 We can launch `mutt` to watch our emails using just `mutt` :tada:!
 
 To send emails we will use `bsd-mailx`:
@@ -217,7 +247,6 @@ sudo apt install bsd-mailx
 ```
 
 This is the same command as on macOS.
-
 
 We can send an email to the root account using :
 
@@ -231,25 +260,22 @@ The script to monitor /etc/crontab file :
 #!/usr/bin/env bash
 
 readonly SUM_FILE="$HOME/.crontab.sum"
+readonly WATCHED_FILE="/etc/crontab"
 
 touch $SUM_FILE
 
 oldsum=$(cat $SUM_FILE)
-newsum=$(shasum /etc/crontab | awk '{ print $1 }')
-
-echo $oldsum
-echo $newsum
+newsum=$(shasum $WATCHED_FILE | awk '{ print $1 }')
 
 if [ "$oldsum" != "$newsum" ]
 then
 	# a modification occured, send an email to the root user
 	echo $newsum > $SUM_FILE
 
-	cat <<'EOF' | sudo mail -s "The file /etc/crontab has been modified" root@localhost
-Go to /etc/crontab NOW !
+	cat <<EOF | sudo mail -s "The file $WATCHED_FILE has been modified" root@localhost
+Go to $WATCHED_FILE NOW !
 Someone modified it !
 EOF
-
 fi
 ```
 
@@ -264,3 +290,8 @@ To append this cron job to the previous ones inserted do :
 ```
 sudo crontab -l | cat - ./monitor.cron > crontab.txt && sudo crontab crontab.txt && rm crontab.txt
 ```
+
+## Serve a Web page with HTTPS
+
+We serve through Nginx a [website](https://github.com/Devessier/login-page-sapper) built using Svelte, Sapper and TailwindCSS.
+We add HTTPS support thanks to an [self-signed SSL certificate](https://www.digitalocean.com/community/tutorials/how-to-create-a-self-signed-ssl-certificate-for-nginx-in-ubuntu-16-04).

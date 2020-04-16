@@ -1,2 +1,0 @@
-@reboot /home/roger/update.sh
-0 4 * * 1 /home/roger/update.sh
