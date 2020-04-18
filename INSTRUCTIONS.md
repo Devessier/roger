@@ -1,10 +1,12 @@
-We use Debian.
-
 # These are instructions to setup our Roger
+
+We use Debian.
 
 ## Follow instructions in the Debian installer
 
 This is not really difficult, just create 2 partitions, of 4.2G and 4.4G respectively.
+
+To get devices sizes run `lsbkl` or `sudo fdisk -l` or to get sizes in bytes run `lsblk -b` or `sudo fdisk -l --bytes`.
 
 ## Add the created user to sudoers group
 
@@ -16,6 +18,7 @@ And then and the user to the sudoers group.
 - In the settings of the VM in VirtualBox, replace `NAT` by `Bridged Adaptater`
 - Enable `enp0s3` in /etc/network/interfaces
 - Configure the file `/etc/network/interfaces` :
+
 ```
 # This file describes the network interfaces available on your system
 # and how to activate them. For more information, see interfaces(5).
@@ -33,13 +36,15 @@ iface enp0s3 inet static
 	address 192.168.68.117
 	netmask 255.255.255.252
 	gateway 192.168.68.1
-	broadcast 192.168.255
+	broadcast 192.168.68.255
 	dns-nameservers 192.168.8.254
 ```
+
 - Restart the network service with `sudo service networking restart`
 - We should see our new IP using `ip addr show enp0s3` 🎉
 
 There will be two `inet` addresses :
+
 - One with /30 netmask which is the address in the VM
 - Another with /16 netmask which permits to access the VM from the host
 
@@ -50,39 +55,20 @@ The following operations have to be completed into `/etc/ssh/sshd_config` file :
 1. Change the sshd port by modifying `Port 22` to `Port 2222`
 2. Disallow root login by setting `PermitRootLogin` to `no`
 3. Create a ssh key for `roger` user using `ssh-keygen`
-4. Force pubkey authentication by returning into `/etc/ssh/sshd_config` for setting `PubkeyAuthentication` to `no`
+4. Force pubkey authentication by returning into `/etc/ssh/sshd_config` and setting `PubkeyAuthentication` to `yes`
 5. Restart `sshd` service with `sudo service sshd restart`
 
 We have some things to do to finish this part :
 
 1. Save that key into the server which in our case is also the client (LOL) : `ssh-copy-id -i ~/.ssh/id_rsa.pub roger@192.168.68.117 -p 2222`
-2. Now when we try to connect using SSH the passphrase will be asked and not anymore our password. The passphrase is `roger`.
+2. Disallow `PasswordAuthentication` and don't `PermitEmptyPasswords`
+3. Now when we try to connect using SSH the passphrase will be asked and not anymore our password. The passphrase is `roger`.
 
 ## Configure the Firewall
 
-We will only accept HTTP, HTTPS and SSH using `ufw`.
-
-Install `ufw` with `sudo apt intall ufw`.
-
-Run :
-```
-# By default deny all incoming requests
-sudo ufw default deny incoming
-
-# To accept SSH connections
-sudo ufw allow 2222/tcp
-
-# To accept HTTP connections
-sudo ufw allow 80/tcp
-
-# To accept HTTPS connections
-sudo ufw allow 443/tcp
-
-# Launch ufw on startup
-sudo ufw enable
-```
-
-Allowing HTTP and HTTPS TCP connections is mandatory for the Web Server Bonus part.
+We setup the firewall using iptables rules.
+See `iptables.sh` file.
+The `iptables-persistent` package can be used to persist iptables rules.
 
 ## Add DOS protections
 
@@ -97,16 +83,19 @@ Look at `http-get-dos` and `sshd` entries.
 
 Install `portsentry`: `sudo apt install portsentry`.
 
-Modify `/etc/default/portsentry` and `/etc/default/portsentry.conf` files to enable automatic mode.
+Modify `/etc/default/portsentry` and `/etc/portsentry/portsentry.conf` files to enable automatic mode.
 
 We can scan ports using :
+
 ```
 nmap -p 1-3000 192.168.68.117
 ```
 
 To unban the IP :
+
 1. check `/etc/hosts.deny` and delete our IP
-2. run `route del <IP> reject`
+2. run `iptables -L --line-numbers`
+3. delete the corresponding entry with `iptables -D <SECTION> <ID>`
 
 ## Stop unused services
 
@@ -156,7 +145,9 @@ networking.service # necessary to have internet connection
 nginx.service # useful for bonus part
 ssh.service
 sshd.service
-ufw.service # our firewall manager
+rsyslog.service # without this service we fail2ban doesn't work
+postfix.service
+netfilter-persistent.service # for iptables/
 ```
 
 Stop all unused services with :
@@ -282,8 +273,8 @@ fi
 Create a file named `monitor.cron` containing the cron scheduling for `monitor.sh` file :
 
 ```
-0 0 * * * ~/monitor.sh
-``` 
+0 0 * * * /home/roger/monitor.sh
+```
 
 To append this cron job to the previous ones inserted do :
 

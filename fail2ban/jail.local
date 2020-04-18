@@ -2,10 +2,10 @@
 
 enabled         = true
 port            = 2222
-logpath         = %(sshd_log)s
-backend         = %(sshd_backend)s
+logfile         = /var/log/auth.log
 maxretry        = 3
-bantime         = 10
+findtime        = 120
+bantime         = 60
 
 [http-get-dos]
 
